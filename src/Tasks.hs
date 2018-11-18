@@ -84,8 +84,7 @@ statsTask dbPathL = do
       ( take 5
       $ fmap (\(a, b) -> show (disp a) ++ ", " ++ show (b - 1) ++ " deps")
       $ List.sortOn (Down . snd)
-      $ fmap (second Set.size)
-      $ Map.toList sizeMap
+      $ second Set.size <$> Map.toList sizeMap
       )
   pure () -- TODO
 
@@ -94,8 +93,7 @@ dbListUnitsTask :: [FilePath] -> IO ()
 dbListUnitsTask dbPathL = do
   infos <- getPkgInfosOrExit dbPathL
   let pkgGraph :: G.Gr InstalledPackageInfo () = fst $ createPkgGraph infos
-  mapM_ putStrLn
-        (map (show . disp . installedUnitId . snd) $ G.labNodes pkgGraph)
+  mapM_ (print . disp . installedUnitId . snd) $ G.labNodes pkgGraph
 
 
 dbGraphTask :: [FilePath] -> IO ()
@@ -203,12 +201,12 @@ registerTask :: Maybe FilePath -> IO ()
 registerTask distNewstylePathM = do
   planFilePath <- case distNewstylePathM of
     Nothing -> do
-      cwd <- liftIO $ Directory.getCurrentDirectory
+      cwd <- liftIO Directory.getCurrentDirectory
       pure $ cwd </> "dist-newstyle" </> "cache" </> "plan.json"
     Just x -> Directory.makeAbsolute $ x </> "cache" </> "plan.json"
   exists <- liftIO $ Directory.doesFileExist planFilePath
   unless exists $ do
-    putStrErrLn $ "could not find plan.json"
+    putStrErrLn "could not find plan.json"
     System.Exit.exitFailure
   planJson <- getPlanFromFileOrExit planFilePath
   let compilerString = read $ TextL.unpack $ Aeson.encodeToLazyText
@@ -224,7 +222,7 @@ registerTask distNewstylePathM = do
 
 reRegister :: [FilePath] -> IO (Either String ())
 reRegister planFilePaths = do
-  planJsons <- fmap join $ planFilePaths `forM` \planFilePath -> do
+  planJsons <- fmap join $ planFilePaths `forM` \planFilePath ->
     try (Cabal.Plan.decodePlanJson planFilePath) >>= \case
       Left (err :: SomeException) -> do
         putStrErrLn
@@ -273,9 +271,9 @@ storeGcTask
 storeGcTask storepathL ghcpkgL compilerL dbPathL dry verbose = do
   ghcpkg <- case ghcpkgL of
     [x] -> pure x
-    []  -> pure $ "ghc-pkg"
+    []  -> pure "ghc-pkg"
     _   -> do
-      putStrErrLn $ "Must specify --with-ghc-pkg at most once"
+      putStrErrLn "Must specify --with-ghc-pkg at most once"
       System.Exit.exitFailure
   compiler <- case compilerL of
     [] -> do
@@ -286,7 +284,7 @@ storeGcTask storepathL ghcpkgL compilerL dbPathL dry verbose = do
           putStrTable "inferred ghc version" r
           pure r
         _ -> do
-          putStrErrLn $ "could not determine version of ghc-pkg"
+          putStrErrLn "could not determine version of ghc-pkg"
           System.Exit.exitFailure
     [x] -> pure x
     _   -> do
@@ -303,8 +301,7 @@ storeGcTask storepathL ghcpkgL compilerL dbPathL dry verbose = do
       putStrErrLn "More than one store path, aborting"
       System.Exit.exitFailure
   pkgdir <- case dbPathL of
-    [] -> do
-      pure $ storepath </> compiler </> "package.db"
+    [] -> pure $ storepath </> compiler </> "package.db"
     -- [x]
     --   | null storepathL -> pure x
     --   | otherwise -> do
@@ -349,15 +346,15 @@ storeGcTask storepathL ghcpkgL compilerL dbPathL dry verbose = do
       putStrErrLn "Stopping due to dry-run"
       when verbose $ do
         putStrLn "Would drop:"
-        toBeDropped `forM_` \x -> do
-          putStrLn $ "  " ++ (show $ disp $ installedUnitId $ x)
+        toBeDropped `forM_` \x ->
+          putStrLn $ "  " ++ (show . disp . installedUnitId) x
     else do
       putStrErr "Performing gc (this is slow atm)"
       toBeDropped `forM_` \uid -> do
         unless verbose $ putStrErr "."
         let uidStr = show $ disp $ installedUnitId uid
         let args   = ["--package-db", pkgdir, "unregister", "--ipid", "--", uidStr]
-        when verbose $ do
+        when verbose $
           putStrErrLn $ "executing `" ++ ghcpkg ++ " " ++ unwords args ++ "`"
         (exitCode, stdout, stderr) <- System.Process.readProcessWithExitCode
           ghcpkg
@@ -375,7 +372,7 @@ storeGcTask storepathL ghcpkgL compilerL dbPathL dry verbose = do
             putStr stderr
             System.Exit.exitFailure
         let packageDirToDelete = storepath </> compiler </> uidStr
-        when verbose $ do
+        when verbose $
           putStrErrLn $ "deleting directory `" ++ packageDirToDelete ++ "`"
         Directory.removeDirectoryRecursive packageDirToDelete
       unless verbose $ putStrErrLn ""
