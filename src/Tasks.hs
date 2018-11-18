@@ -356,7 +356,7 @@ storeGcTask storepathL ghcpkgL compilerL dbPathL dry verbose = do
       toBeDropped `forM_` \uid -> do
         unless verbose $ putStrErr "."
         let uidStr = show $ disp $ installedUnitId uid
-        let args   = ["--package-db", pkgdir, "unregister", "--ipid", uidStr]
+        let args   = ["--package-db", pkgdir, "unregister", "--ipid", "--", uidStr]
         when verbose $ do
           putStrErrLn $ "executing `" ++ ghcpkg ++ " " ++ unwords args ++ "`"
         (exitCode, stdout, stderr) <- System.Process.readProcessWithExitCode
