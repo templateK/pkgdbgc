@@ -1,0 +1,5 @@
+packages: .
+         ../fgl
+
+allow-newer: all
+
